@@ -1,58 +1,76 @@
-import { test, expect } from '@playwright/test';
+import { LoanCalculatorPage } from "../pages/loan-calculator.page";
+import { LoginPopupPage } from "../pages/login-popup.page";
 
-const URL = 'https://loan-decision.tl-academy.ee/small-loan'
+import { test, expect } from "@playwright/test";
 
-test('app in default state', async ({ page }) => {
-  await page.goto(URL);
+test("app in default state", async ({ page }) => {
+  const loanCalculator = new LoanCalculatorPage(page);
 
-  await expect(page.getByTestId('id-small-loan-calculator-field-calculate')).toBeEnabled()
-  await expect(page.getByTestId('id-small-loan-calculator-field-apply')).toBeDisabled()
+  await loanCalculator.goto();
 
-  await page.getByTestId('id-image-element-button-image-1').scrollIntoViewIfNeeded()
-  await page.getByTestId('id-image-element-button-image-1').click()
+  await expect(loanCalculator.calculateButton).toBeEnabled();
+  await expect(loanCalculator.applyButton).toBeDisabled();
 
-  await expect(page.getByTestId('id-small-loan-calculator-field-calculate')).toBeInViewport()
+  await loanCalculator.scrollToImageAndClick();
 
+  await expect(loanCalculator.calculateButton).toBeInViewport();
 });
 
-test('calculate > apply button enabled > request happened', async ({ page }) => {
-  await page.goto(URL);
+test("calculate > apply button enabled > request happened", async ({
+  page,
+}) => {
+  const loanCalculator = new LoanCalculatorPage(page);
 
-  //before action we have to init request listener
-  const requestPromise = page.waitForRequest('**/api/loan-calc?amount=500&period=12')
-  await (page.getByTestId('id-small-loan-calculator-field-calculate')).click()
-  //straight after action
+  await loanCalculator.goto();
+
+  const requestPromise = page.waitForRequest(
+    "**/api/loan-calc?amount=500&period=12",
+  );
+  await loanCalculator.calculate();
   await requestPromise;
-  // validate button is enabled
-  await expect(page.getByTestId('id-small-loan-calculator-field-apply')).toBeEnabled()
 
-  // change amount from default t0 1000
-  await page.getByTestId('id-small-loan-calculator-field-amount').fill('1000')
-  const requestOneKPromise = page.waitForRequest('**/api/loan-calc?amount=1000&period=12')
-  await (page.getByTestId('id-small-loan-calculator-field-calculate')).click()
-  //straight after action
+  await expect(loanCalculator.applyButton).toBeEnabled();
+
+  await loanCalculator.setAmount("1000");
+
+  const requestOneKPromise = page.waitForRequest(
+    "**/api/loan-calc?amount=1000&period=12",
+  );
+  await loanCalculator.calculate();
   await requestOneKPromise;
-
 });
 
-test('login page default state', async ({ page }) => {
-  await page.goto(URL);
+test("login page default state", async ({ page }) => {
+  const loanCalculator = new LoanCalculatorPage(page);
+  const loginPopup = new LoginPopupPage(page);
 
-  await (page.getByTestId('id-small-loan-calculator-field-calculate')).click()
-  await (page.getByTestId('id-small-loan-calculator-field-apply')).click()
-  //check user and password fields visible and 'continue' CTA disabled
-  await expect(page.getByTestId('login-popup-username-input')).toBeVisible()
-  await expect(page.getByTestId('login-popup-password-input')).toBeVisible()
-  await expect(page.getByTestId('login-popup-continue-button')).toBeDisabled()
+  await loanCalculator.goto();
+  await loanCalculator.calculate();
+  await loanCalculator.apply();
 
-  //click smart id and check smart id field
-  await (page.getByTestId('login-popup-tab-smart-id')).click()
-  await expect(page.getByTestId('login-popup-personal-code-input')).toBeVisible()
-  await expect(page.getByTestId('login-popup-continue-button')).toBeDisabled()
+  await expect(loginPopup.usernameInput).toBeVisible();
+  await expect(loginPopup.passwordInput).toBeVisible();
+  await expect(loginPopup.continueButton).toBeDisabled();
 
+  await loginPopup.selectSmartId();
 
+  await expect(loginPopup.personalCodeInput).toBeVisible();
+  await expect(loginPopup.continueButton).toBeDisabled();
+});
 
+test("complete loan application flow", async ({ page }) => {
+  const loanCalculator = new LoanCalculatorPage(page);
+  const loginPopup = new LoginPopupPage(page);
 
+  await loanCalculator.goto();
+  await loanCalculator.calculate();
+  await loanCalculator.apply();
 
+  const loanDetails = await loginPopup.login("anna", "Tallinn1");
+  const income = await loanDetails.continue();
 
+  await income.setMonthlyIncome("2000");
+  const decision = await income.getDecision();
+
+  await expect(decision.title).toHaveText("Loan approved!");
 });
