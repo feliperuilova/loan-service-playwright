@@ -30,4 +30,11 @@ export class LoginPopupPage {
 
     return new LoanDetailsPage(this.page);
   }
+  async loginWithSmartId(personalCode: string) {
+    await this.selectSmartId();
+    await this.personalCodeInput.fill(personalCode);
+    await this.continueButton.click();
+
+    return new LoanDetailsPage(this.page);
+  }
 }
